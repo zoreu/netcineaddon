@@ -106,4 +106,5 @@ def options_handler(path):
     return add_cors_headers(response)
 
 if __name__ == '__main__':
+    # executar server
     app.run(debug=True ,host='0.0.0.0', port=80)
