@@ -2,6 +2,7 @@ from urllib.parse import urlparse, quote_plus
 import requests
 from bs4 import BeautifulSoup
 import re
+import json
 
 def catalog_search(text):
     catalog = []
@@ -30,8 +31,6 @@ def catalog_search(text):
     except:
         pass
     return catalog
-
-
 
 def resolve_stream(url):
     parsed_url = urlparse(url)
@@ -71,3 +70,158 @@ def resolve_stream(url):
     except:
         pass
     return stream, headers
+
+def search_term(imdb):
+    url = 'https://www.imdb.com/pt/title/%s/'%imdb
+    keys = []
+    try:
+        r = requests.get(url,headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0', 'Accept-Language': 'pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3'})
+        src = r.text
+        script = re.findall('json">(.*?)</script>', src, re.DOTALL)[0]
+        title = re.findall('<title>(.*?)</title>', src)[0]
+        data = json.loads(script)
+        name = data.get('name', '')
+        name2 = data.get('alternateName', '')
+        if name:
+            keys.append(name)
+        if name2:
+            keys.append(name2)
+        try:
+            year_ = re.findall('Série de TV (.*?)\)', title)
+            if not year_:
+                year_ = re.findall('\((.*?)\)', title)
+            if year_:
+                year = year_[0]
+                try:
+                    year = year.split('–')[0]
+                except:
+                    pass
+        except:
+            year = ''       
+
+    except:
+        pass
+    return keys, year
+
+def opcoes_filmes(url,headers, host):
+    dublado = []
+    legendado = []         
+    try:
+        headers.update({'Cookie': 'XCRF%3DXCRF'})
+        r = requests.get(url,headers=headers)
+        src = r.text
+        soup = BeautifulSoup(src,'html.parser')
+        player = soup.find('div', {'id': 'player-container'})
+        botoes = player.find('ul', {'class': 'player-menu'})
+        op = botoes.findAll('li')
+        op_list = []
+        if op:
+            for i in op:
+                a = i.find('a')
+                id_ = a.get('href', '').replace('#', '')
+                op_name = a.text
+                try:
+                    op_name = op_name.decode('utf-8')
+                except:
+                    pass
+                op_name = op_name.replace(' 1', '').replace(' 2', '').replace(' 3', '').replace(' 4', '').replace(' 5', '')
+                op_name = op_name.strip()
+                op_name = op_name.upper()
+                op_list.append((op_name,id_))
+        if op_list:
+            for name, id_ in op_list:
+                iframe = player.find('div', {'class': 'play-c'}).find('div', {'id': id_}).find('iframe').get('src', '')
+                if not 'streamtape' in iframe:
+                    link = host + iframe
+                else:
+                    link = iframe
+                if 'dublado' in name.lower() and not 'streamtape' in link:
+                    dublado.append(link)                    
+                elif 'legendado' in name.lower() and not 'streamtape' in link:
+                    legendado.append(link)
+    except:
+        pass
+    if dublado:
+        return dublado[-1]
+    elif legendado:
+        return legendado[-1]
+    else:
+        return ''
+
+
+def scrape_search(host,headers,text,year_imdb):
+    url = requests.get(host,headers=headers).url
+    url_parsed = urlparse(url)
+    new_host = url_parsed.scheme + '://' + url_parsed.hostname + '/'
+    url_search = new_host + '?s=' + quote_plus(text)
+    headers.update({'Cookie': 'XCRF%3DXCRF'})
+    r = requests.get(url_search,headers=headers)
+    src = r.text
+    soup = BeautifulSoup(src,'html.parser')
+    box = soup.find("div", {"id": "box_movies"})
+    movies = box.findAll("div", {"class": "movie"})
+    for i in movies:
+        name = i.find('h2').text
+        try:
+            name = name.decode('utf-8')
+        except:
+            pass                
+        try:
+            year = i.find('span', {'class': 'year'}).text
+            year = year.replace('–', '')
+        except:
+            year = ''
+        if text in name and str(year_imdb) in str(year):
+            img = i.find('div', {'class': 'imagen'})
+            link = img.find('a').get('href', '')
+            return link, new_host
+    return ''   
+
+
+def search_link(id):
+    stream = ''
+    host = 'https://netcinetv.fi/'
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, como Gecko) Chrome/88.0.4324.96 Safari/537.36"}
+    headers_ = {}
+    try:
+        if ':' in id:
+            parts = id.split(':')
+            imdb = parts[0]
+            season = parts[1]
+            episode = parts[2]
+            search_text, year_imdb = search_term(imdb)
+            if search_text and year_imdb:
+                text = search_text[-1]
+                link, new_host = scrape_search(host,headers,text,year_imdb)
+                if '/tvshows/' in link:
+                    #### SÉRIES EPISODES
+                    r = requests.get(link,headers=headers)
+                    src = r.text
+                    soup = BeautifulSoup(src,'html.parser')
+                    s = soup.find('div', {'id': 'movie'}).find('div', {'class': 'post'}).find('div', {'id': 'cssmenu'}).find('ul').findAll('li', {'class': 'has-sub'})
+                    for n, i in enumerate(s):
+                        n += 1
+                        if int(season) == n:
+                            e = i.find('ul').findAll('li')
+                            for n, i in enumerate(e):
+                                n += 1
+                                if int(episode) == n:
+                                    e_info = i.find('a')
+                                    link = e_info.get('href')
+                                    page = opcoes_filmes(link,headers, new_host)
+                                    stream, headers_ = resolve_stream(page)   
+        else:
+            imdb = id
+            search_text, year_imdb = search_term(imdb)
+            if search_text and year_imdb:
+                text = search_text[-1]
+                link, new_host = scrape_search(host,headers,text,year_imdb)
+                if not '/tvshows/' in link:
+                    page = opcoes_filmes(link,headers, new_host)
+                    stream, headers_  = resolve_stream(page)
+    except:
+        pass
+    return stream, headers_                 
+    
+
+

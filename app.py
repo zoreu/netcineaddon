@@ -1,6 +1,5 @@
 from flask import Flask, jsonify, request, make_response, render_template
-from urllib.parse import urlparse
-from netcine import catalog_search
+from netcine import catalog_search, search_link
 
 app = Flask(__name__)
 
@@ -11,37 +10,13 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type'  # Headers permitidos
     return response
 
-# Exemplo de catálogo de filmes e séries
-catalog = [
-    {
-        "id": "tt0111161",
-        "type": "movie",
-        "title": "The Shawshank Redemption",
-        "year": 1994,
-        "poster": "https://m.media-amazon.com/images/M/MV5BNDE3ODcxYzMtY2YzZC00NmNlLWJiNDMtZDViZWM2MzIxZDYwXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_SX300.jpg"
-    },
-    {
-        "id": "tt0068646",
-        "type": "movie",
-        "title": "The Godfather",
-        "year": 1972,
-        "poster": "https://m.media-amazon.com/images/M/MV5BM2MyNjYxNmUtYTAwNi00MTYxLWJmNWYtYzZlODY3ZTk3OTFlXkEyXkFqcGdeQXVyNzkwMjQ5NzM@._V1_SX300.jpg"
-    },
-    {
-        "id": "tt0944947",
-        "type": "series",
-        "title": "Game of Thrones",
-        "year": 2011,
-        "poster": "https://m.media-amazon.com/images/M/MV5BYTRiNDQwYzAtMzVlZS00NTI5LWJjYjUtMzkwNTUzMWMxZTllXkEyXkFqcGdeQXVyNDIzMzcwNjc@._V1_SX300.jpg"
-    }
-]
 
 MANIFEST = {
         "id": "com.netcineaddon",
         "version": "1.0.0",
         "name": "NETCINE",
         "description": "Tenha o melhor dos filmes e séries com netcine",
-        'logo': 'https://i.imgur.com/qVgkbYn.png',
+        'logo': 'https://i.imgur.com/GCnr8Nm.png',
         "resources": ["catalog", "stream"],  # Adicione "catalog/search"
         "types": ["movie", "series"],  # Tipos de conteúdo suportados
         "catalogs": [
@@ -79,9 +54,6 @@ def manifest():
 # Rota para o catálogo
 @app.route('/catalog/<type>/<id>.json')
 def catalog_route(type, id):
-    # response = jsonify({
-    #     "metas": [item for item in catalog if item["type"] == type]
-    # })
     response = jsonify({
         "metas": []
     })
@@ -103,23 +75,25 @@ def search(type, query):
 # Rota para streams (exemplo simples)
 @app.route('/stream/<type>/<id>.json')
 def stream(type, id):
-    # url = 'https://netcinetv.fi/media-player/nv32mono.php?n=OPCHEFAOP1LEG&p=filmes2023/pchefao'
-    # stream_, headers = resolve_vod(url)
-    scrape_ = []
-    # scrape_ = [{
-    #         "url": stream_,
-    #         "name": "NETCINE",
-    #         "description": "NETCINE",
-    #         "behaviorHints": {
-    #             "notWebReady": True,
-    #             "proxyHeaders": {
-    #                 "request": {
-    #                     "User-Agent": headers['User-Agent'],
-    #                     "Referer": headers['Referer']
-    #                 }
-    #             }
-    #         }
-    #     }]    
+    try:
+        stream_, headers = search_link(id)
+        scrape_ = [{
+                "url": stream_,
+                "name": "NETCINE",
+                "description": "NETCINE",
+                "behaviorHints": {
+                    "notWebReady": True,
+                    "proxyHeaders": {
+                        "request": {
+                            "User-Agent": headers['User-Agent'],
+                            "Referer": headers['Referer'],
+                            "Cookie": headers['Cookie']
+                        }
+                    }
+                }
+            }]
+    except:
+        scrape_ = []   
     response = jsonify({
         "streams": scrape_
     })
