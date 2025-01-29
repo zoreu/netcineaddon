@@ -181,6 +181,24 @@ def scrape_search(host,headers,text,year_imdb):
             year = year.replace('–', '')
         except:
             year = ''
+        try:
+            text = text.lower()
+            text = text.replace(':', '')
+        except:
+            pass
+        try:
+            name = name.lower()
+            name = name.replace(':', '')
+        except:
+            pass
+        try:
+            text2 = text2.lower()
+        except:
+            pass
+        try:
+            name2 = name2.lower()
+        except:
+            pass
         if text in name and str(year_imdb) in str(year) or text2 in name2 and str(year_imdb) in str(year):
             img = i.find('div', {'class': 'imagen'})
             link = img.find('a').get('href', '')
