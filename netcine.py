@@ -153,7 +153,15 @@ def scrape_search(host,headers,text,year_imdb):
     url = requests.get(host,headers=headers).url
     url_parsed = urlparse(url)
     new_host = url_parsed.scheme + '://' + url_parsed.hostname + '/'
-    url_search = new_host + '?s=' + quote_plus(text)
+    try:
+        keys_search = text.split(' ')
+        if len(keys_search) > 2:
+            search_ = ' '.join(keys_search[:-1])
+        else:
+            search_ = text
+    except:
+        search_ = text    
+    url_search = new_host + '?s=' + quote_plus(search_)
     headers.update({'Cookie': 'XCRF%3DXCRF'})
     r = requests.get(url_search,headers=headers)
     src = r.text
@@ -237,7 +245,9 @@ def search_link(id):
                                     e_info = i.find('a')
                                     link = e_info.get('href')
                                     page = opcoes_filmes(link,headers, new_host)
-                                    stream, headers_ = resolve_stream(page)   
+                                    stream, headers_ = resolve_stream(page)
+                                    break
+                            break   
         else:
             imdb = id
             search_text, year_imdb = search_term(imdb)
@@ -249,7 +259,5 @@ def search_link(id):
                     stream, headers_  = resolve_stream(page)
     except:
         pass
-    return stream, headers_                 
-    
-
+    return stream, headers_   
 
