@@ -165,13 +165,23 @@ def scrape_search(host,headers,text,year_imdb):
         try:
             name = name.decode('utf-8')
         except:
-            pass                
+            pass
+        try:
+            keys = name.split(' ')
+            name2 = ' '.join(keys[:-1])
+        except:
+            name2 = ''
+        try:
+            keys2 = text.split(' ')
+            text2 = ' '.join(keys2[:-1])
+        except:
+            text2 = ''                           
         try:
             year = i.find('span', {'class': 'year'}).text
             year = year.replace('–', '')
         except:
             year = ''
-        if text in name and str(year_imdb) in str(year):
+        if text in name and str(year_imdb) in str(year) or text2 in name2 and str(year_imdb) in str(year):
             img = i.find('div', {'class': 'imagen'})
             link = img.find('a').get('href', '')
             return link, new_host
